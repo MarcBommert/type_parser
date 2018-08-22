@@ -125,34 +125,93 @@ namespace ns_type_parser_csharp_backend
       }
     }
 
+    /* must be consistent with mappedBaseTypes in ordering and length */
+    static string[] baseTypes =
+    {
+        "Pointer",
+        "Char32",
+        "UInt",
+        "Long",
+        "Int",
+        "Char16",
+        "WChar",
+        "UShort",
+        "Short",
+        "SChar",
+        "Char_S",
+        "UChar",
+        "LongLong",
+        "ULongLong",
+        "Bool",
+        "UInt128",
+        "Float",
+        "Double",
+        "LongDouble",
+    };
+
+    /* must be consistent with baseTypes in ordering and length */
+    static string[] mappedBaseTypes =
+    {
+        "IntPtr",
+        "uint",
+        "uint",
+        "int",
+        "int",
+        "ushort",
+        "ushort",
+        "ushort",
+        "short",
+        "short",
+        "short",
+        "byte",
+        "long",
+        "ulong",
+        "bool",
+        "UInt128?",
+        "float",
+        "double",
+        "LongDouble?",
+    };
+
     static bool isBaseType(Type t)
     {
-      string[] baseTypes =
-      {
-         "UInt",
-         "IntPtr",
-         "UInt",
-         "Int",
-         "Bool",
-         "UShort",
-         "SChar",
-         "Short",
-         "LongLong",
-         "UChar",
-         "UShort",
-         "ULongLong",
-      };
-
       foreach (string s in baseTypes)
         if (t.abTypeName == s)
           return true;
       return false;
     }
+
+    static string mapBaseType(string typeName)
+    {
+      for (int i = 0; i < baseTypes.Length; i++)
+        if (baseTypes[i] == typeName)
+          return mappedBaseTypes[i];
+      return null;
+    }
   
+
+    static Type FindPrimitiveType(Type type)
+    {
+      foreach (Type t in typeList)
+      {
+        if (t.abMemberName == type.abTypeName)
+          return FindPrimitiveType(t);
+      }
+      return type;
+    }
+
+    static Type FindType(string abTypeName)
+    {
+      foreach (Type t in typeList)
+      {
+        if (t.abTypeName == abTypeName)
+          return t;
+      }
+      return null;
+    }
 
     static void dump_type(Type type, int indent)
     {
-      
       switch (type.eKind)
       {
         case Type.Kind.STRUCT:
@@ -174,68 +233,53 @@ namespace ns_type_parser_csharp_backend
           break;
 
         case Type.Kind.ARRAY:
-          _indent(indent);
-          System.Console.WriteLine("[MarshalAs(UnmanagedType.ByValArray, SizeConst = " + type.iSize + ")]");
-          _indent(indent);
-          if (type.atChildren[0].abTypeName == "uint32_t")
           {
-            System.Console.Write("public uint ");
+            _indent(indent);
+            System.Console.WriteLine("[MarshalAs(UnmanagedType.ByValArray, SizeConst = " + type.iSize + ")]");
+            _indent(indent);
+            Type t = FindPrimitiveType(type.atChildren[0]);
+
+            string mappedBaseType = mapBaseType(t.abTypeName);
+            if (mappedBaseType != null)
+            {
+              System.Console.WriteLine(String.Format("public {0}[] {1};", mappedBaseType, type.abMemberName));
+            }
+            else
+            {
+              System.Console.Write("public " + t.abMemberName + "[] ");
+              System.Console.WriteLine(type.abMemberName + ";");
+            }
           }
-          else if (type.atChildren[0].abTypeName == "uint16_t")
-          {
-            System.Console.Write("public ushort ");
-          }
-          else if (type.atChildren[0].abTypeName == "uint8_t")
-          {
-            System.Console.Write("public byte ");
-          }
-          else if (type.atChildren[0].abTypeName == "Pointer")
-          {
-            System.Console.Write("public IntPtr ");
-          }
-          else
-          {
-            System.Console.Write(type.abTypeName + " ");
-          }
-          System.Console.WriteLine("[] " + type.abMemberName + ";");
           break;
 
         case Type.Kind.SIMPLE:
-          _indent(indent);
-          if (type.abTypeName == "uint32_t")
           {
-            System.Console.Write("public uint ");
-            System.Console.WriteLine(type.abMemberName + ";");
+            Type t = FindPrimitiveType(type);
+            _indent(indent);
+
+            if (!isBaseType(type))
+            {
+              string mappedBaseType = mapBaseType(t.abTypeName);
+
+              if (mappedBaseType != null)
+              {
+                System.Console.WriteLine(String.Format("public {0} {1};", mappedBaseType, type.abMemberName));
+              }
+              else
+              {
+                if (FindType(type.abTypeName) != null)
+                {
+                  System.Console.WriteLine("/* !!! FIXME: Type " + type.abTypeName + " seems to be a simple typedef for which there is not equivalent in C#. */");
+                }
+                else
+                {
+                  System.Console.Write("public " + type.abTypeName + " ");
+                  System.Console.WriteLine(type.abMemberName + ";");
+                }
+              }
+            }
+            break;
           }
-          else if (type.abTypeName == "uint16_t")
-          {
-            System.Console.Write("public ushort ");
-            System.Console.WriteLine(type.abMemberName + ";");
-          }
-          else if (type.abTypeName == "uint8_t")
-          {
-            System.Console.Write("public byte ");
-            System.Console.WriteLine(type.abMemberName + ";");
-          }
-          else if ((type.abTypeName == "Pointer") && (type.abMemberName == "va_list"))
-          {
-            /* skip */
-          }
-          else if (type.abTypeName == "Pointer")
-          {
-            System.Console.Write("public IntPtr ");
-            System.Console.WriteLine(type.abMemberName + ";");
-          }
-          else if (isBaseType(type))
-          {
-            /* skip */
-          }
-          else
-          {
-            System.Console.Write("public " + type.abTypeName + " ");
-            System.Console.WriteLine(type.abMemberName + ";");
-          }
-          break;
         case Type.Kind.ENUM:
           System.Console.WriteLine("public enum " + type.abMemberName + "\n{");
           foreach (Type c in type.atChildren)
@@ -249,7 +293,7 @@ namespace ns_type_parser_csharp_backend
           break;
         case Type.Kind.UNION:
           _indent(indent);
-          System.Console.WriteLine("/* Union type is not supported in C# ! Skipping union " + type.abMemberName + ". Please fix manually !!! */");
+          System.Console.WriteLine("/* !!! FIXME: Union type is not supported in C# ! Skipping union " + type.abMemberName + ". */");
           break;
         default:
           break;
