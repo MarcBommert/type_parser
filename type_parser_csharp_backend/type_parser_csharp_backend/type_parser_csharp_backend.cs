@@ -269,7 +269,7 @@ namespace ns_type_parser_csharp_backend
               {
                 if (FindType(type.abTypeName) != null)
                 {
-                  System.Console.WriteLine("/* !!! FIXME: Type " + type.abTypeName + " seems to be a simple typedef for which there is not equivalent in C#. */");
+                  System.Console.WriteLine("/* !!! FIXME: Type " + type.abMemberName + " seems to be a simple typedef (alias of " + type.abTypeName + ") for which there is not equivalent in C#. */");
                 }
                 else
                 {
