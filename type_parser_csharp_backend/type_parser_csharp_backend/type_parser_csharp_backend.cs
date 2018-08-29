@@ -219,7 +219,7 @@ namespace ns_type_parser_csharp_backend
           if (type.iAlignment == 1)
           {
             _indent(indent);
-            System.Console.WriteLine("[StructLayout(LayoutKind.Sequential)]");
+            System.Console.WriteLine("[StructLayout(LayoutKind.Sequential, Pack=1)]");
           }
 
           _indent(indent);
@@ -320,7 +320,21 @@ namespace ns_type_parser_csharp_backend
         return;
       }
 
+      /* uniq */
+      List<Define> uniqueDefines = new List<Define>();
       foreach (Define d in defineList)
+      {
+        bool fAlreadyContained = false;
+        foreach (Define d2 in uniqueDefines)
+        {
+          if (d2.abName == d.abName)
+            fAlreadyContained = true;
+        }
+
+        if (!fAlreadyContained)
+          uniqueDefines.Add(d);
+      }
+      foreach (Define d in uniqueDefines)
       {
         System.Console.WriteLine("public const uint " + d.abName + " = " + d.abValue + ";");
       }
